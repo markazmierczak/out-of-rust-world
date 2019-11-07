@@ -1,0 +1,18 @@
+[package]
+name = "ano-the-rs-world"
+version = "0.1.0"
+authors = ["Marcin Kaźmierczak <mar.kazmierczak@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+byteorder = "1.3.2"
+rand = "0.7.2"
+log = "0.4.8"
+clap = "2.33.0"
+env_logger = "0.7.1"
+
+[dependencies.sdl2]
+version = "0.32.2"
+features = [ "unsafe_textures" ]
