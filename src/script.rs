@@ -1,4 +1,4 @@
-use super::{mem, video, Game};
+use super::{mem, sfx, video, Game};
 use rand::Rng;
 use std::time::{Duration, Instant};
 
@@ -129,7 +129,7 @@ fn op_add_const(g: &mut Game) {
         //  (0x6D46) break
         //  (0x6D47) VAR(0x06) += -50
         //
-        // TODO: snd_playSound(0x5B, 1, 64, 1);
+        play_sound_shim(g, 0x5B, 1, 64, 1);
     }
 
     let dst = fetch_index8(g);
@@ -352,8 +352,7 @@ pub fn stage_tasks(g: &mut Game) {
 }
 
 pub fn restart_at(g: &mut Game, part: u16, pos: i16) {
-    // TODO: sfx_player.stop();
-    // TODO: audio_mixer.stop();
+    sfx::stop_sound_and_music(g);
 
     g.vm.regs[0xE4] = 20;
     if part == 16000 {
@@ -543,34 +542,47 @@ fn op_change_pal(g: &mut Game) {
 }
 
 fn op_play_sound(g: &mut Game) {
-    let _resource = fetch_u16(g);
-    let _frequency = fetch_u8(g);
-    let _volume = fetch_u8(g);
-    let _channel = fetch_u8(g);
-    log::trace!(
-        "snd {}, {}, {}, {}",
-        _resource,
-        _frequency,
-        _volume,
-        _channel
-    );
-    // TODO: audio.play_sound(resource, frequency, volume, channel);
+    let resource = fetch_u16(g);
+    let freq = fetch_u8(g);
+    let volume = fetch_u8(g);
+    let channel = fetch_u8(g);
+
+    log::trace!("snd {}, {}, {}, {}", resource, freq, volume, channel);
+
+    play_sound_shim(g, resource, freq, volume, channel);
+}
+
+fn play_sound_shim(g: &mut Game, resource: u16, freq: u8, volume: u8, channel: u8) {
+    if volume == 0 {
+        sfx::stop_sound(g, channel);
+    } else {
+        let volume = std::cmp::min(volume, 0x3F);
+        if let Some(address) = mem::address_of_entry(&g.mem, resource) {
+            let freq = crate::data::FREQUENCY_TABLE[usize::from(freq)];
+            sfx::play_sound(g, channel & 3, address, freq, volume);
+        }
+    }
 }
 
 fn op_play_music(g: &mut Game) {
-    let _resource = fetch_u16(g);
-    let _delay = fetch_u16(g);
-    let _pos = fetch_u8(g);
-    log::trace!("music {}, {}, {}", _resource, _delay, _pos);
-    // TODO: audio.play_music(resource, delay, pos);
+    let resource = fetch_u16(g);
+    let delay = fetch_u16(g);
+    let pos = fetch_u8(g);
+
+    log::trace!("music {}, {}, {}", resource, delay, pos);
+
+    if resource != 0 {
+        sfx::seek(g, resource, delay, pos);
+    } else {
+        g.music.set_delay(delay);
+    }
 }
 
 fn op_update_resources(g: &mut Game) {
     let num = fetch_u16(g);
     log::trace!("res {}", num);
     if num == 0 {
-        // TODO: sfx_player.stop()
-        // TODO: audio_mixer.stop()
+        sfx::stop_sound_and_music(g);
         mem::invalidate_res(&mut g.mem);
         g.video.invalidate_pal_num();
     } else if num >= 16000 {

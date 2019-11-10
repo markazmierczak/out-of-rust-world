@@ -12,7 +12,8 @@ rand = "0.7.2"
 log = "0.4.8"
 clap = "2.33.0"
 env_logger = "0.7.1"
+libc = "0.2.65"
 
 [dependencies.sdl2]
 version = "0.32.2"
-features = [ "unsafe_textures" ]
+features = [ "unsafe_textures", "mixer" ]

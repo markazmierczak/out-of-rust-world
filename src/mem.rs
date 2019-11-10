@@ -31,8 +31,15 @@ struct Entry {
     unpacked_size: usize,
 }
 
-mod entry_kind {
+pub mod entry_kind {
+    #![allow(dead_code)]
+    pub const SOUND: u8 = 0;
+    pub const MUSIC: u8 = 1;
     pub const BITMAP: u8 = 2;
+    pub const PALETTE: u8 = 3;
+    pub const BYTECODE: u8 = 4;
+    pub const SHAPE: u8 = 5;
+    pub const BANK: u8 = 6;
 }
 
 const DATA_SIZE: usize = 1 * 1024 * 1024;
@@ -142,11 +149,11 @@ pub fn setup_part(g: &mut Game, part_id: u16) {
         load_entries(g);
 
         let m = &mut g.mem;
-        m.seg_video_pal = address_of_entry(m, ipal);
-        m.seg_code = address_of_entry(m, icod);
-        m.seg_video1 = address_of_entry(m, ivd1);
+        m.seg_video_pal = address_of_entry(m, ipal).unwrap();
+        m.seg_code = address_of_entry(m, icod).unwrap();
+        m.seg_video1 = address_of_entry(m, ivd1).unwrap();
         if ivd2 != 0 {
-            m.seg_video2 = address_of_entry(m, ivd2);
+            m.seg_video2 = address_of_entry(m, ivd2).unwrap();
         }
 
         g.current_part = part_id;
@@ -155,8 +162,26 @@ pub fn setup_part(g: &mut Game, part_id: u16) {
     g.mem.data_bak = g.mem.data_cur;
 }
 
-fn address_of_entry(m: &Memory, index: u8) -> usize {
-    m.list[usize::from(index)].address
+pub fn address_of_entry(m: &Memory, index: impl Into<usize>) -> Option<usize> {
+    let entry = &m.list[index.into()];
+    if entry.status == STATUS_READY {
+        Some(entry.address)
+    } else {
+        None
+    }
+}
+
+pub fn address_of_entry_with_kind(
+    m: &Memory,
+    index: impl Into<usize> + Copy,
+    kind: u8,
+) -> Option<usize> {
+    let entry = &m.list[index.into()];
+    if entry.kind == kind {
+        address_of_entry(m, index)
+    } else {
+        None
+    }
 }
 
 pub fn invalidate_res(m: &mut Memory) {

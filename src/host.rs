@@ -10,6 +10,15 @@ pub struct Host {
     surface: sdl2::render::Texture,
     color_buffer: Vec<u16>,
     canvas: sdl2::render::Canvas<sdl2::video::Window>,
+
+    audio_cvt: sdl2::audio::AudioCVT,
+    audio_channels: [AudioChannel; 4],
+}
+
+#[derive(Default)]
+struct AudioChannel {
+    chunk: Option<sdl2::mixer::Chunk>,
+    samples: Vec<u8>,
 }
 
 fn as_u8_slice(v: &[u16]) -> &[u8] {
@@ -40,8 +49,9 @@ impl Host {
         let sdl_context = sdl2::init().unwrap();
         let video_subsystem = sdl_context.video().unwrap();
 
+        // TODO: full-screen
         let window = video_subsystem
-            .window("rust-sdl2 demo", 800, 600)
+            .window("Out Of Rust World", 800, 600)
             .position_centered()
             .build()
             .unwrap();
@@ -62,15 +72,34 @@ impl Host {
 
         let _event_pump = sdl_context.event_pump().unwrap();
 
+        use sdl2::audio::AudioFormat;
+        let audio_cvt =
+            sdl2::audio::AudioCVT::new(AudioFormat::S8, 1, 11025, AudioFormat::s16_sys(), 2, 44100)
+                .unwrap();
+
         Self {
             sdl_context,
             video_subsystem,
             canvas,
             surface,
             color_buffer: vec![0; FB_SIZE],
+            audio_channels: Default::default(),
+            audio_cvt,
         }
     }
 }
+
+pub fn play_sound(h: &mut Host, channel: u8, freq: u16, volume: u8, data: &[u8], len: u16) {
+    stop_sound(h, channel);
+    // TODO: implement
+}
+
+pub fn stop_sound(h: &mut Host, channel: u8) {
+    sdl2::mixer::Channel(channel.into()).halt();
+    h.audio_channels[usize::from(channel)].chunk = None;
+}
+
+// TODO: sdl2::sys::mixer::Mix_HookMusic();
 
 /* TODO:
 for event in event_pump.poll_iter() {

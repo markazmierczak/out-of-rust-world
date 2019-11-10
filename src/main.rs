@@ -7,6 +7,7 @@ mod mem;
 #[allow(dead_code)]
 mod pak;
 mod script;
+mod sfx;
 mod video;
 
 use host::Host;
@@ -25,6 +26,7 @@ pub struct Game {
     looping_gun_quirk: bool,
     bypass_protection: bool,
 
+    music: sfx::Player,
     host: Host,
 }
 
@@ -54,6 +56,7 @@ pub fn main() {
         video: VideoContext::new(),
         vm: Vm::new(),
         mem: Memory::new(),
+        music: Default::default(),
         current_part: 0,
         next_part: None,
         screen_num: None,
