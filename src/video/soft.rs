@@ -10,7 +10,7 @@ const COL_PAGE: u8 = 0x11;
 pub const FB_SIZE: usize = (SCR_W * SCR_H) as usize;
 
 pub struct State {
-    fb: [[u8; FB_SIZE]; 4],
+    fb: Box<[[u8; FB_SIZE]; 4]>,
     pal: [RgbColor; 16],
 }
 
@@ -190,9 +190,8 @@ fn grab(s: &mut State, fb: u8, x: u16, y: u16) -> u8 {
 
 impl State {
     pub fn new() -> Self {
-        let fb = [[0; FB_SIZE], [0; FB_SIZE], [0; FB_SIZE], [0; FB_SIZE]];
         Self {
-            fb,
+            fb: Box::new([[0; FB_SIZE], [0; FB_SIZE], [0; FB_SIZE], [0; FB_SIZE]]),
             pal: Default::default(),
         }
     }

@@ -1,6 +1,7 @@
 [package]
 name = "ano-the-rs-world"
 version = "0.1.0"
+build = "build.rs"
 authors = ["Marcin Kaźmierczak <mar.kazmierczak@gmail.com>"]
 edition = "2018"
 

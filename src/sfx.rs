@@ -2,6 +2,7 @@ use crate::{mem, Game};
 use byteorder::{ByteOrder, BE};
 
 pub const HOST_RATE: u16 = 44100;
+pub const GAME_RATE: u16 = 11025;
 
 #[derive(Default)]
 pub struct Player {
@@ -104,13 +105,8 @@ fn cvt_delay(delay: u16) -> u16 {
     (u32::from(delay) * 60 / 7050) as u16
 }
 
-pub fn mix_samples(g: &mut Game, mut out: &mut [i8]) {
-    if g.music.delay == 0 {
-        for b in out {
-            *b = 0;
-        }
-        return;
-    }
+pub fn mix_samples(g: &mut Game, mut out: &mut [i16]) {
+    assert!(g.music.delay != 0);
 
     let mut len = (out.len() / 2) as u16;
     let samples_per_tick = HOST_RATE / (1000 / g.music.delay);
@@ -127,11 +123,11 @@ pub fn mix_samples(g: &mut Game, mut out: &mut [i8]) {
         for i in 0..count {
             let sample = mix_channel(g, 0, 0);
             let sample = mix_channel(g, 3, sample);
-            out[usize::from(i * 2)] = sample;
+            out[usize::from(i * 2)] = i16::from(sample) * 256;
 
             let sample = mix_channel(g, 1, 0);
             let sample = mix_channel(g, 2, sample);
-            out[usize::from(i * 2 + 1)] = sample;
+            out[usize::from(i * 2 + 1)] = i16::from(sample) * 256;
         }
 
         out = &mut out[usize::from(count * 2)..];
@@ -140,7 +136,7 @@ pub fn mix_samples(g: &mut Game, mut out: &mut [i8]) {
     nr(out)
 }
 
-fn nr(out: &mut [i8]) {
+fn nr(out: &mut [i16]) {
     let mut prev_l = 0;
     let mut prev_r = 0;
 
@@ -276,15 +272,32 @@ impl Player {
     pub fn set_delay(&mut self, delay: u16) {
         self.delay = cvt_delay(delay);
     }
+
+    pub fn is_end_of_track(&self) -> bool {
+        self.delay == 0
+    }
 }
 
 pub fn play_sound(g: &mut Game, channel: u8, address: usize, freq: u16, volume: u8) {
     let data = &g.mem.data[address..];
     let len = BE::read_u16(data) * 2;
     let loop_len = BE::read_u16(&data[2..]) * 2;
-    let len = if loop_len != 0 { loop_len } else { len };
 
-    crate::host::play_sound(&mut g.host, channel, freq, volume, &data[8..], len);
+    let (len, loops) = if loop_len != 0 {
+        (loop_len, -1)
+    } else {
+        (len, 0)
+    };
+
+    crate::host::play_sound(
+        &mut g.host,
+        channel,
+        freq,
+        volume,
+        &data[8..],
+        len.into(),
+        loops,
+    );
 }
 
 pub fn stop_sound(g: &mut Game, channel: u8) {
@@ -299,35 +312,34 @@ pub fn stop_sound_and_music(g: &mut Game) {
 }
 
 #[derive(Default, Clone, Copy)]
-struct Frac {
+pub struct Frac {
     inc: u32,
     offset: u64,
 }
 
 impl Frac {
     const BITS: u32 = 16;
-    const MASK: u64 = 0xFFFF;
 
-    fn new(n: impl Into<u32>, d: impl Into<u32>) -> Self {
+    pub fn new(n: impl Into<u32>, d: impl Into<u32>) -> Self {
         Self {
             inc: (n.into() << Self::BITS) / d.into(),
             offset: 0,
         }
     }
 
-    fn int(self) -> u32 {
+    pub fn int(self) -> u32 {
         (self.offset >> Frac::BITS) as u32
     }
 
-    fn set_int(&mut self, int: u32) {
+    pub fn set_int(&mut self, int: u32) {
         self.offset = u64::from(int) << Frac::BITS;
     }
 
-    fn frac(self) -> u16 {
+    pub fn frac(self) -> u16 {
         self.offset as u16
     }
 
-    fn inc(&mut self) {
+    pub fn inc(&mut self) {
         self.offset += u64::from(self.inc);
     }
 

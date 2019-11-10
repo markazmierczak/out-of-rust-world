@@ -597,10 +597,14 @@ fn op_update_display(g: &mut Game) {
     log::trace!("swap {}", page);
 
     const HZ: i32 = 50;
-    let delay = g.vm.last_swap_time.elapsed().as_millis() as i32;
-    let pause = i32::from(g.vm.regs[reg_id::PAUSE_SLICES]) * 1000 / HZ - delay;
-    if pause > 0 {
-        std::thread::sleep(Duration::from_millis(pause as u64));
+    let mut delay = g.vm.last_swap_time.elapsed().as_millis() as i32;
+    for i in 0..g.vm.regs[reg_id::PAUSE_SLICES] {
+        crate::host::push_music_frame(g);
+        delay -= 1000 / HZ;
+        if delay < 0 {
+            std::thread::sleep(Duration::from_millis(-delay as u64));
+            delay = 0;
+        }
     }
 
     g.vm.last_swap_time = Instant::now();

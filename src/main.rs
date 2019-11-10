@@ -34,7 +34,6 @@ pub fn run_frame(g: &mut Game) {
     script::stage_tasks(g);
     script::update_input(g);
     script::run_tasks(g);
-    // TODO: audio_mixer::update
 }
 
 pub fn main() {
@@ -77,7 +76,7 @@ pub fn main() {
         script::restart_at(&mut game, scene, -1);
     }
 
-    'running: loop {
+    loop {
         run_frame(&mut game);
     }
 }

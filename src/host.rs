@@ -1,5 +1,5 @@
 use crate::video::soft::{FB_SIZE, SCR_H, SCR_W};
-use crate::Game;
+use crate::{sfx, Game};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
@@ -11,14 +11,16 @@ pub struct Host {
     color_buffer: Vec<u16>,
     canvas: sdl2::render::Canvas<sdl2::video::Window>,
 
+    mixer_context: sdl2::mixer::Sdl2MixerContext,
     audio_cvt: sdl2::audio::AudioCVT,
-    audio_channels: [AudioChannel; 4],
+    audio_channels: [AudioChannel<u8>; 4],
+    music_channel: AudioChannel<i16>,
 }
 
 #[derive(Default)]
-struct AudioChannel {
+struct AudioChannel<T> {
     chunk: Option<sdl2::mixer::Chunk>,
-    samples: Vec<u8>,
+    samples: Vec<T>,
 }
 
 fn as_u8_slice(v: &[u16]) -> &[u8] {
@@ -73,9 +75,19 @@ impl Host {
         let _event_pump = sdl_context.event_pump().unwrap();
 
         use sdl2::audio::AudioFormat;
-        let audio_cvt =
-            sdl2::audio::AudioCVT::new(AudioFormat::S8, 1, 11025, AudioFormat::s16_sys(), 2, 44100)
-                .unwrap();
+        let audio_cvt = sdl2::audio::AudioCVT::new(
+            AudioFormat::S8,
+            1,
+            sfx::GAME_RATE.into(),
+            AudioFormat::s16_sys(),
+            2,
+            sfx::HOST_RATE.into(),
+        )
+        .unwrap();
+
+        let mixer_context = sdl2::mixer::init(sdl2::mixer::InitFlag::MID).unwrap();
+        sdl2::mixer::open_audio(sfx::HOST_RATE.into(), sdl2::mixer::AUDIO_S16SYS, 2, 4096).unwrap();
+        sdl2::mixer::allocate_channels(5);
 
         Self {
             sdl_context,
@@ -83,15 +95,58 @@ impl Host {
             canvas,
             surface,
             color_buffer: vec![0; FB_SIZE],
+            mixer_context,
             audio_channels: Default::default(),
+            // FIXME: use frame rate constant
+            music_channel: AudioChannel {
+                chunk: None,
+                samples: vec![0; usize::from(sfx::HOST_RATE) / 50],
+            },
             audio_cvt,
         }
     }
 }
 
-pub fn play_sound(h: &mut Host, channel: u8, freq: u16, volume: u8, data: &[u8], len: u16) {
+pub fn play_sound(
+    h: &mut Host,
+    channel: u8,
+    freq: u16,
+    volume: u8,
+    data: &[u8],
+    len: usize,
+    loops: i32,
+) {
+    assert!(sfx::GAME_RATE / freq <= 4);
     stop_sound(h, channel);
-    // TODO: implement
+
+    let ac = &mut h.audio_channels[usize::from(channel)];
+    ac.samples.resize(h.audio_cvt.capacity(len * 4), 0);
+
+    let mut pos = sfx::Frac::new(freq, sfx::GAME_RATE);
+    let mut n = 0;
+    while pos.int() < (len as u32) {
+        ac.samples[n] = data[pos.int() as usize];
+        n += 1;
+        pos.inc();
+    }
+    ac.samples.truncate(n);
+    ac.samples = h
+        .audio_cvt
+        .convert(std::mem::replace(&mut ac.samples, Vec::new()));
+
+    ac.chunk = Some({
+        let raw_chunk = unsafe {
+            sdl2::sys::mixer::Mix_QuickLoad_RAW(ac.samples.as_mut_ptr(), ac.samples.len() as u32)
+        };
+        sdl2::mixer::Chunk {
+            raw: raw_chunk,
+            owned: true,
+        }
+    });
+
+    let channel = sdl2::mixer::Channel(channel.into());
+    channel.play(ac.chunk.as_ref().unwrap(), loops).unwrap();
+    channel.set_volume(i32::from(volume) * sdl2::mixer::MAX_VOLUME / 63);
 }
 
 pub fn stop_sound(h: &mut Host, channel: u8) {
@@ -99,7 +154,28 @@ pub fn stop_sound(h: &mut Host, channel: u8) {
     h.audio_channels[usize::from(channel)].chunk = None;
 }
 
-// TODO: sdl2::sys::mixer::Mix_HookMusic();
+pub fn push_music_frame(g: &mut Game) {
+    if g.music.is_end_of_track() {
+        return;
+    }
+
+    let mut samples = std::mem::replace(&mut g.host.music_channel.samples, Vec::new());
+    sfx::mix_samples(g, &mut samples);
+    let channel = &mut g.host.music_channel;
+    channel.samples = samples;
+    channel.chunk = Some({
+        let raw_chunk = unsafe {
+            sdl2::sys::mixer::Mix_QuickLoad_RAW(
+                channel.samples.as_mut_ptr() as *mut u8,
+                channel.samples.len() as u32,
+            )
+        };
+        sdl2::mixer::Chunk {
+            raw: raw_chunk,
+            owned: true,
+        }
+    });
+}
 
 /* TODO:
 for event in event_pump.poll_iter() {
