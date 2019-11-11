@@ -1,20 +1,24 @@
 use crate::video::soft::{FB_SIZE, SCR_H, SCR_W};
 use crate::{sfx, Game};
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 
 pub struct Host {
+    #[allow(dead_code)]
     sdl_context: sdl2::Sdl,
+    #[allow(dead_code)]
     video_subsystem: sdl2::VideoSubsystem,
     surface: sdl2::render::Texture,
     color_buffer: Vec<u16>,
     canvas: sdl2::render::Canvas<sdl2::video::Window>,
+    event_pump: sdl2::EventPump,
 
+    #[allow(dead_code)]
     mixer_context: sdl2::mixer::Sdl2MixerContext,
     audio_cvt: sdl2::audio::AudioCVT,
     audio_channels: [AudioChannel<u8>; 4],
     music_channel: AudioChannel<i16>,
+    wants_quit: bool,
+    wants_pause: bool,
 }
 
 #[derive(Default)]
@@ -72,7 +76,7 @@ impl Host {
         canvas.clear();
         canvas.present();
 
-        let _event_pump = sdl_context.event_pump().unwrap();
+        let event_pump = sdl_context.event_pump().unwrap();
 
         use sdl2::audio::AudioFormat;
         let audio_cvt = sdl2::audio::AudioCVT::new(
@@ -103,7 +107,18 @@ impl Host {
                 samples: vec![0; usize::from(sfx::HOST_RATE) / 50],
             },
             audio_cvt,
+            event_pump,
+            wants_quit: false,
+            wants_pause: false,
         }
+    }
+
+    pub fn wants_quit(&self) -> bool {
+        self.wants_quit
+    }
+
+    pub fn wants_pause(&self) -> bool {
+        self.wants_pause
     }
 }
 
@@ -177,14 +192,46 @@ pub fn push_music_frame(g: &mut Game) {
     });
 }
 
-/* TODO:
-for event in event_pump.poll_iter() {
-    match event {
-        Event::Quit { .. }
-        | Event::KeyDown {
-            keycode: Some(Keycode::Escape),
-            ..
-        } => break 'running,
-        _ => {}
+pub fn process_input(g: &mut Game) {
+    use sdl2::event::Event;
+    use sdl2::keyboard::Keycode;
+    use std::convert::TryFrom;
+
+    for event in g.host.event_pump.poll_iter() {
+        match event {
+            Event::Quit { .. }
+            | Event::KeyDown {
+                keycode: Some(Keycode::Escape),
+                ..
+            } => g.host.wants_quit = true,
+
+            Event::KeyDown {
+                keycode: Some(k), ..
+            } => {
+                match k {
+                    Keycode::Left => g.input.left = true,
+                    Keycode::Right => g.input.right = true,
+                    Keycode::Up => g.input.up = true,
+                    Keycode::Down => g.input.down = true,
+                    Keycode::Space | Keycode::Return => g.input.button = true,
+                    Keycode::P => g.host.wants_pause = !g.host.wants_pause,
+                    _ => {}
+                }
+                g.input.last_char = u8::try_from(k as i32).ok();
+            }
+
+            Event::KeyUp {
+                keycode: Some(k), ..
+            } => match k {
+                Keycode::Left => g.input.left = false,
+                Keycode::Right => g.input.right = false,
+                Keycode::Up => g.input.up = false,
+                Keycode::Down => g.input.down = false,
+                Keycode::Space | Keycode::Return => g.input.button = false,
+                _ => {}
+            },
+
+            _ => {}
+        }
     }
-}*/
+}

@@ -80,6 +80,54 @@ impl Vm {
     }
 }
 
+#[derive(Default)]
+pub struct Input {
+    pub last_char: Option<u8>,
+    pub right: bool,
+    pub left: bool,
+    pub down: bool,
+    pub up: bool,
+    pub button: bool,
+}
+
+fn is_valid_keychar(c: u8) -> bool {
+    c == 0x08 || (b'a' <= c && c <= b'z')
+}
+
+fn make_dir(ul: bool, rd: bool) -> i16 {
+    match (ul, rd) {
+        (false, false) => 0,
+        (false, true) => 1,
+        (true, _) => -1,
+    }
+}
+
+pub fn update_input(g: &mut Game) {
+    let regs = &mut g.vm.regs;
+    let input = &mut g.input;
+
+    if g.current_part == 16009 {
+        regs[reg_id::LAST_KEYCHAR] = match input.last_char.take() {
+            Some(c) if is_valid_keychar(c) => c & !0x20,
+            _ => 0,
+        }
+        .into();
+    }
+
+    regs[reg_id::HERO_POS_LEFT_RIGHT] = make_dir(input.left, input.right);
+    regs[reg_id::HERO_POS_UP_DOWN] = make_dir(input.up, input.down);
+    regs[reg_id::HERO_POS_JUMP_DOWN] = make_dir(input.up, input.down);
+
+    let mask = u8::from(input.right)
+        | (u8::from(input.left) << 1)
+        | (u8::from(input.down) << 2)
+        | (u8::from(input.up) << 3);
+
+    regs[reg_id::HERO_POS_MASK] = mask.into();
+    regs[reg_id::HERO_ACTION] = input.button.into();
+    regs[reg_id::HERO_ACTION_POS_MASK] = (mask | (u8::from(input.button) << 7)).into();
+}
+
 fn fetch_u8(g: &mut Game) -> u8 {
     let offset = usize::from(g.vm.pc) + g.mem.seg_code();
     let b = g.mem.data[offset];
@@ -598,7 +646,7 @@ fn op_update_display(g: &mut Game) {
 
     const HZ: i32 = 50;
     let mut delay = g.vm.last_swap_time.elapsed().as_millis() as i32;
-    for i in 0..g.vm.regs[reg_id::PAUSE_SLICES] {
+    for _ in 0..g.vm.regs[reg_id::PAUSE_SLICES] {
         crate::host::push_music_frame(g);
         delay -= 1000 / HZ;
         if delay < 0 {
@@ -610,6 +658,7 @@ fn op_update_display(g: &mut Game) {
     g.vm.last_swap_time = Instant::now();
     g.vm.regs[0xF7] = 0;
 
+    // FIXME: shouldn't this be before sleep
     let fb = video::swap_pages(&mut g.video, page);
 
     if let Some(num) = g.next_pal.take() {
@@ -627,15 +676,4 @@ fn fixup_pal_after_change_screen(g: &mut Game, screen: i16) {
     } {
         video::load_pal_mem(g, pal);
     }
-}
-
-pub fn update_input(g: &mut Game) {
-    let regs = &mut g.vm.regs;
-    regs[reg_id::LAST_KEYCHAR] = 0;
-    regs[reg_id::HERO_POS_UP_DOWN] = 0;
-    regs[reg_id::HERO_POS_JUMP_DOWN] = 0;
-    regs[reg_id::HERO_POS_LEFT_RIGHT] = 0;
-    regs[reg_id::HERO_POS_MASK] = 0;
-    regs[reg_id::HERO_ACTION] = 0;
-    regs[reg_id::HERO_ACTION_POS_MASK] = 0;
 }

@@ -15,6 +15,8 @@ use mem::Memory;
 use script::Vm;
 use video::VideoContext;
 
+// FIXME: ability to resize a window during gameplay
+
 pub struct Game {
     mem: Memory,
     vm: Vm,
@@ -28,6 +30,7 @@ pub struct Game {
 
     music: sfx::Player,
     host: Host,
+    input: script::Input,
 }
 
 pub fn run_frame(g: &mut Game) {
@@ -62,7 +65,10 @@ pub fn main() {
         next_pal: None,
         looping_gun_quirk: false,
         bypass_protection: true,
+        input: Default::default(),
     };
+
+    game.video.set_use_ega_pal(matches.is_present("ega-pal"));
 
     let scene = matches
         .value_of("scene")
@@ -76,7 +82,12 @@ pub fn main() {
         script::restart_at(&mut game, scene, -1);
     }
 
-    loop {
-        run_frame(&mut game);
+    while !game.host.wants_quit() {
+        if !game.host.wants_pause() {
+            run_frame(&mut game);
+        } else {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        host::process_input(&mut game);
     }
 }

@@ -267,6 +267,10 @@ impl VideoContext {
         self.dc = new_dc;
         self.use_seg2 = use_seg2;
     }
+
+    pub fn set_use_ega_pal(&mut self, on: bool) {
+        self.use_ega_pal = on;
+    }
 }
 
 fn fetch_u8(g: &mut Game) -> u8 {
