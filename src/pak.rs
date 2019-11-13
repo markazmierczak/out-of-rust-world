@@ -30,7 +30,7 @@ impl Package {
         let mut data = vec![0; length];
         f.read_exact(&mut data)?;
 
-        if data.starts_with("TooDC".as_bytes()) {
+        if data.starts_with(b"TooDC") {
             decode_toodc(&mut data[6..]);
             data.drain(0..10);
         }
@@ -62,16 +62,15 @@ impl Entry {
     }
 }
 
-// FIXME:
-const CHECKSUM: u32 = 0x20202020;
+const CHECKSUM: u32 = 0x2020_2020;
 
 fn decode_toodc(data: &mut [u8]) {
     assert!(
-        (data.len() & 3) == 0,
+        data.len().trailing_zeros() >= 2,
         "invalid length for encoded TooDC data"
     );
 
-    const XOR_KEY2: u32 = 0x22683297;
+    const XOR_KEY2: u32 = 0x2268_3297;
 
     let mut key = XOR_KEY2;
     let mut acc = 0;

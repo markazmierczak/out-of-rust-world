@@ -2,6 +2,9 @@ use crate::video::soft::{FB_SIZE, SCR_H, SCR_W};
 use crate::{sfx, Game};
 use sdl2::pixels::Color;
 
+const MUSIC_SAMPLES_PER_FRAME: usize = (sfx::HOST_RATE as usize) / 50 * 2;
+const MUSIC_BUFFER_LEN: usize = MUSIC_SAMPLES_PER_FRAME * 8;
+
 pub struct Host {
     #[allow(dead_code)]
     sdl_context: sdl2::Sdl,
@@ -16,7 +19,9 @@ pub struct Host {
     mixer_context: sdl2::mixer::Sdl2MixerContext,
     audio_cvt: sdl2::audio::AudioCVT,
     audio_channels: [AudioChannel<u8>; 4],
-    music_channel: AudioChannel<i16>,
+    music_chan: rb::SpscRb<i16>,
+    music_chan_prod: rb::Producer<i16>,
+    music_buf: std::rc::Rc<std::cell::RefCell<Vec<i16>>>,
     wants_quit: bool,
     wants_pause: bool,
 }
@@ -52,6 +57,8 @@ pub fn display_surface(g: &mut Game, fb: u8) {
 
 impl Host {
     pub fn new() -> Self {
+        use rb::RB;
+
         let sdl_context = sdl2::init().unwrap();
         let video_subsystem = sdl_context.video().unwrap();
 
@@ -89,9 +96,19 @@ impl Host {
         )
         .unwrap();
 
-        let mixer_context = sdl2::mixer::init(sdl2::mixer::InitFlag::MID).unwrap();
+        let mixer_context = init_mixer();
         sdl2::mixer::open_audio(sfx::HOST_RATE.into(), sdl2::mixer::AUDIO_S16SYS, 2, 4096).unwrap();
-        sdl2::mixer::allocate_channels(5);
+        sdl2::mixer::allocate_channels(4);
+
+        let music_chan = rb::SpscRb::new(MUSIC_BUFFER_LEN);
+        let (music_chan_prod, music_chan_cons) = (music_chan.producer(), music_chan.consumer());
+
+        unsafe {
+            sdl2::sys::mixer::Mix_HookMusic(
+                Some(consume_music),
+                Box::into_raw(Box::new(music_chan_cons)) as *mut libc::c_void,
+            );
+        }
 
         Self {
             sdl_context,
@@ -101,12 +118,10 @@ impl Host {
             color_buffer: vec![0; FB_SIZE],
             mixer_context,
             audio_channels: Default::default(),
-            // FIXME: use frame rate constant
-            music_channel: AudioChannel {
-                chunk: None,
-                samples: vec![0; usize::from(sfx::HOST_RATE) / 50],
-            },
             audio_cvt,
+            music_chan,
+            music_chan_prod,
+            music_buf: std::cell::RefCell::new(Vec::new()).into(),
             event_pump,
             wants_quit: false,
             wants_pause: false,
@@ -120,6 +135,12 @@ impl Host {
     pub fn wants_pause(&self) -> bool {
         self.wants_pause
     }
+}
+
+fn init_mixer() -> sdl2::mixer::Sdl2MixerContext {
+    let ret = unsafe { sdl2::sys::mixer::Mix_Init(0) };
+    assert_eq!(ret, 0);
+    sdl2::mixer::Sdl2MixerContext
 }
 
 pub fn play_sound(
@@ -169,27 +190,29 @@ pub fn stop_sound(h: &mut Host, channel: u8) {
     h.audio_channels[usize::from(channel)].chunk = None;
 }
 
-pub fn push_music_frame(g: &mut Game) {
+pub fn produce_music(g: &mut Game) {
+    use rb::{RbInspector, RbProducer};
+
     if g.music.is_end_of_track() {
         return;
     }
 
-    let mut samples = std::mem::replace(&mut g.host.music_channel.samples, Vec::new());
-    sfx::mix_samples(g, &mut samples);
-    let channel = &mut g.host.music_channel;
-    channel.samples = samples;
-    channel.chunk = Some({
-        let raw_chunk = unsafe {
-            sdl2::sys::mixer::Mix_QuickLoad_RAW(
-                channel.samples.as_mut_ptr() as *mut u8,
-                channel.samples.len() as u32,
-            )
-        };
-        sdl2::mixer::Chunk {
-            raw: raw_chunk,
-            owned: true,
-        }
-    });
+    let buf = g.host.music_buf.clone();
+    let mut buf = buf.borrow_mut();
+    buf.resize(g.host.music_chan.slots_free(), 0);
+    sfx::mix_samples(g, &mut *buf);
+    g.host.music_chan_prod.write(&*buf).unwrap();
+}
+
+#[allow(clippy::cast_ptr_alignment)]
+unsafe extern "C" fn consume_music(udata: *mut libc::c_void, stream: *mut u8, len: libc::c_int) {
+    use rb::RbConsumer;
+    let music_chan_cons = (udata as *mut rb::Consumer<i16>).as_ref().unwrap();
+    let out = std::slice::from_raw_parts_mut(stream as *mut i16, (len as usize) / 2);
+    let count = music_chan_cons.read(out).unwrap_or(0);
+    for sample in &mut out[count..] {
+        *sample = 0;
+    }
 }
 
 pub fn process_input(g: &mut Game) {

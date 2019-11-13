@@ -61,9 +61,7 @@ pub fn seek(g: &mut Game, res_num: u16, delay: u16, cur_order: u8) {
     let num_order = BE::read_u16(&data[address + 0x3E..]);
 
     let mut order_table = TrackOrderTable::default();
-    for i in 0..0x80 {
-        order_table.0[i] = data[0x40 + i];
-    }
+    order_table.0[..0x80].clone_from_slice(&data[64..(0x80 + 64)]);
 
     g.music.delay = cvt_delay(if delay == 0 {
         BE::read_u16(data)
@@ -151,6 +149,7 @@ fn nr(out: &mut [i16]) {
     }
 }
 
+#[allow(clippy::collapsible_if)]
 fn mix_channel(g: &mut Game, ch: usize, in_sample: i8) -> i8 {
     let ch = &mut g.music.channels[ch];
     if ch.sample_len == 0 {
@@ -186,7 +185,7 @@ fn process_events(g: &mut Game) {
     let order = track.order_table.0[usize::from(track.cur_order)];
     let address = track.address + usize::from(track.cur_pos) + usize::from(order) * 1024;
     for ch in 0..4 {
-        handle_pattern(g, ch, address + usize::from(ch) * 4);
+        handle_pattern(g, ch, address + ch * 4);
     }
 
     let track = &mut g.music.track;
@@ -257,7 +256,7 @@ fn handle_pattern(g: &mut Game, channel: usize, address: usize) {
     } else if note1 != 0 && pattern.sample_address != 0 {
         assert!(note1 >= 0x37 && note1 < 0x1000);
         // Convert Amiga period value to Hz.
-        let freq = (7159092 / (u32::from(note1) * 2)) as u16;
+        let freq = (7_159_092 / (u32::from(note1) * 2)) as u16;
         let ch = &mut g.music.channels[channel];
         ch.sample_address = pattern.sample_address + usize::from(pattern.sample_start);
         ch.sample_len = pattern.sample_len;

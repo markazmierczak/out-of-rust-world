@@ -419,10 +419,8 @@ pub fn restart_at(g: &mut Game, part: u16, pos: i16) {
         g.vm.regs[0] = pos;
     }
 
-    if g.video.needs_pal_fixup() {
-        if part == 16009 {
-            video::load_pal_mem(g, 5);
-        }
+    if g.video.needs_pal_fixup() && part == 16009 {
+        video::load_pal_mem(g, 5);
     }
 
     g.vm.last_swap_time = Instant::now();
@@ -502,6 +500,7 @@ fn op_copy_page(g: &mut Game) {
     video::copy_page(&mut g.video, src, dst, g.vm.regs[reg_id::SCROLL_Y]);
 }
 
+#[allow(clippy::collapsible_if)]
 fn op_draw_shape(g: &mut Game, opcode: u8) {
     if (opcode & 0x80) != 0 {
         let offset = ((u16::from(opcode) << 8) | u16::from(fetch_u8(g))) << 1;
@@ -647,7 +646,7 @@ fn op_update_display(g: &mut Game) {
     const HZ: i32 = 50;
     let mut delay = g.vm.last_swap_time.elapsed().as_millis() as i32;
     for _ in 0..g.vm.regs[reg_id::PAUSE_SLICES] {
-        crate::host::push_music_frame(g);
+        crate::host::produce_music(g);
         delay -= 1000 / HZ;
         if delay < 0 {
             std::thread::sleep(Duration::from_millis(-delay as u64));

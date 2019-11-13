@@ -56,6 +56,7 @@ pub fn draw_point(s: &mut State, fb: u8, x: u16, y: u16, color: u8) {
     out(s, fb, x, y, color);
 }
 
+#[allow(clippy::many_single_char_names)]
 pub fn draw_polygon(s: &mut State, fb: u8, qs: &QuadStrip, color: u8) {
     let vs = qs.vertices();
     if vs.len() <= 2 {
@@ -91,8 +92,8 @@ pub fn draw_polygon(s: &mut State, fb: u8, qs: &QuadStrip, color: u8) {
         i += 1;
         j -= 1;
 
-        cpt1 = (cpt1 & 0xFFFF0000) | 0x7FFF;
-        cpt2 = (cpt2 & 0xFFFF0000) | 0x8000;
+        cpt1 = (cpt1 & 0xFFFF_0000) | 0x7FFF;
+        cpt2 = (cpt2 & 0xFFFF_0000) | 0x8000;
 
         if h == 0 {
             cpt1 = cpt1.wrapping_add(step1);
@@ -138,8 +139,8 @@ fn calc_step(v1: Vertex, v2: Vertex) -> (u32, u16) {
 
 fn draw_h_line_alpha(s: &mut State, fb: u8, offset: usize, w: u16, _color: u8) {
     let p = &mut s.fb[usize::from(fb)][offset..];
-    for i in 0..usize::from(w) {
-        p[i] |= 8;
+    for px in &mut p[..usize::from(w)] {
+        *px |= 8;
     }
 }
 
@@ -154,8 +155,8 @@ fn draw_h_line_page(s: &mut State, fb: u8, offset: usize, w: u16, _color: u8) {
 
 fn draw_h_line_color(s: &mut State, fb: u8, offset: usize, w: u16, color: u8) {
     let p = &mut s.fb[usize::from(fb)][offset..];
-    for i in 0..usize::from(w) {
-        p[i] = color;
+    for px in &mut p[..usize::from(w)] {
+        *px = color;
     }
 }
 

@@ -210,6 +210,8 @@ fn find_string(table: &[(u16, &'static str)], id: u16) -> Option<&'static str> {
     table.iter().find(|item| item.0 == id).map(|item| item.1)
 }
 
+#[allow(clippy::identity_op)]
+#[allow(clippy::erasing_op)]
 pub fn copy_bitmap(v: &mut VideoContext, mem: &[u8]) {
     let mut image = [0; 320 * 200];
     let mut di = 0;

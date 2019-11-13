@@ -42,7 +42,7 @@ pub mod entry_kind {
     pub const BANK: u8 = 6;
 }
 
-const DATA_SIZE: usize = 1 * 1024 * 1024;
+const DATA_SIZE: usize = 1024 * 1024;
 const DATA_BMP_OFFSET: usize = DATA_SIZE - 0x800 * 16;
 
 impl Memory {
