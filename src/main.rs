@@ -51,7 +51,7 @@ pub fn main() {
         )
         .get_matches();
 
-    let host = Host::new();
+    let host = Host::new(matches.is_present("fullscreen"));
 
     let mut game = Game {
         host,

@@ -56,18 +56,21 @@ pub fn display_surface(g: &mut Game, fb: u8) {
 }
 
 impl Host {
-    pub fn new() -> Self {
+    pub fn new(fullscreen: bool) -> Self {
         use rb::RB;
 
         let sdl_context = sdl2::init().unwrap();
         let video_subsystem = sdl_context.video().unwrap();
 
-        // TODO: full-screen
-        let window = video_subsystem
-            .window("Out Of Rust World", 800, 600)
-            .position_centered()
-            .build()
-            .unwrap();
+        let mut window = video_subsystem.window("Out Of Rust World", 800, 600);
+
+        if fullscreen {
+            window.fullscreen();
+        } else {
+            window.position_centered();
+        }
+
+        let window = window.build().unwrap();
 
         let mut canvas = window.into_canvas().build().unwrap();
         let texture_creator = canvas.texture_creator();

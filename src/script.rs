@@ -643,6 +643,14 @@ fn op_update_display(g: &mut Game) {
     let page = fetch_u8(g);
     log::trace!("swap {}", page);
 
+    let fb = video::swap_pages(&mut g.video, page);
+
+    if let Some(num) = g.next_pal.take() {
+        video::load_pal_mem(g, num);
+    }
+
+    crate::host::display_surface(g, fb);
+
     const HZ: i32 = 50;
     let mut delay = g.vm.last_swap_time.elapsed().as_millis() as i32;
     for _ in 0..g.vm.regs[reg_id::PAUSE_SLICES] {
@@ -656,15 +664,6 @@ fn op_update_display(g: &mut Game) {
 
     g.vm.last_swap_time = Instant::now();
     g.vm.regs[0xF7] = 0;
-
-    // FIXME: shouldn't this be before sleep
-    let fb = video::swap_pages(&mut g.video, page);
-
-    if let Some(num) = g.next_pal.take() {
-        video::load_pal_mem(g, num);
-    }
-
-    crate::host::display_surface(g, fb);
 }
 
 fn fixup_pal_after_change_screen(g: &mut Game, screen: i16) {
