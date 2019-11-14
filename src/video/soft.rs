@@ -22,17 +22,17 @@ pub fn clear_fb(s: &mut State, fb: u8, color: u8) {
 
 pub fn copy_fb(s: &mut State, dst_fb: u8, src_fb: u8, v_scroll: i32) {
     assert_ne!(dst_fb, src_fb);
-    let dst = s.fb[usize::from(dst_fb)].as_mut_ptr();
-    let src = s.fb[usize::from(src_fb)].as_ptr();
+    let mut dst = s.fb[usize::from(dst_fb)].as_mut_ptr();
+    let mut src = s.fb[usize::from(src_fb)].as_ptr();
     let count = if -199 <= v_scroll && v_scroll <= 199 {
         if v_scroll < 0 {
             unsafe {
-                src.add((-v_scroll as usize) * usize::from(SCR_W));
+                src = src.add((-v_scroll as usize) * usize::from(SCR_W));
             }
             (i32::from(SCR_H) + v_scroll) * i32::from(SCR_W)
         } else if v_scroll > 0 {
             unsafe {
-                dst.add((v_scroll as usize) * usize::from(SCR_W));
+                dst = dst.add((v_scroll as usize) * usize::from(SCR_W));
             }
             (i32::from(SCR_H) - v_scroll) * i32::from(SCR_W)
         } else {
