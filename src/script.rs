@@ -91,7 +91,7 @@ pub struct Input {
 }
 
 fn is_valid_keychar(c: u8) -> bool {
-    c == 0x08 || (b'a' <= c && c <= b'z')
+    c == 0x08 || (b'a'..=b'z').contains(&c)
 }
 
 fn make_dir(ul: bool, rd: bool) -> i16 {
@@ -550,14 +550,12 @@ fn op_draw_shape(g: &mut Game, opcode: u8) {
             } else {
                 g.vm.regs[usize::from(zoom)] as u16
             }
+        } else if (opcode & 0x01) != 0 {
+            use_seg2 = true;
+            g.vm.pc -= 1;
+            0x40
         } else {
-            if (opcode & 0x01) != 0 {
-                use_seg2 = true;
-                g.vm.pc -= 1;
-                0x40
-            } else {
-                u16::from(zoom)
-            }
+            u16::from(zoom)
         };
 
         g.video.set_dc(offset, use_seg2);

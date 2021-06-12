@@ -128,7 +128,7 @@ pub fn setup_part(g: &mut Game, part_id: u16) {
     let m = &mut g.mem;
     if g.current_part != part_id {
         assert!(
-            16000 <= part_id && part_id <= 16009,
+            (16000..=16009).contains(&part_id),
             "invalid part {}",
             part_id
         );

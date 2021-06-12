@@ -171,7 +171,7 @@ pub fn play_sound(
     ac.samples.truncate(n);
     ac.samples = h
         .audio_cvt
-        .convert(std::mem::replace(&mut ac.samples, Vec::new()));
+        .convert(std::mem::take(&mut ac.samples));
 
     ac.chunk = Some({
         let raw_chunk = unsafe {

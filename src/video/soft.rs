@@ -20,6 +20,7 @@ pub fn clear_fb(s: &mut State, fb: u8, color: u8) {
     }
 }
 
+#[allow(clippy::comparison_chain)]
 pub fn copy_fb(s: &mut State, dst_fb: u8, src_fb: u8, v_scroll: i32) {
     assert_ne!(dst_fb, src_fb);
     let mut dst = s.fb[usize::from(dst_fb)].as_mut_ptr();

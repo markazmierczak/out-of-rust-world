@@ -165,11 +165,9 @@ fn mix_channel(g: &mut Game, ch: usize, in_sample: i8) -> i8 {
             pos2 = u32::from(ch.sample_loop_pos);
             ch.pos.set_int(pos2);
         }
-    } else {
-        if pos2 == u32::from(ch.sample_len) {
-            ch.sample_len = 0;
-            return in_sample;
-        }
+    } else if pos2 == u32::from(ch.sample_len) {
+        ch.sample_len = 0;
+        return in_sample;
     }
 
     let data = &g.mem.data[ch.sample_address..];
@@ -254,7 +252,7 @@ fn handle_pattern(g: &mut Game, channel: usize, address: usize) {
     if note1 == 0xFFFE {
         g.music.channels[channel].sample_len = 0;
     } else if note1 != 0 && pattern.sample_address != 0 {
-        assert!(note1 >= 0x37 && note1 < 0x1000);
+        assert!((0x37..0x1000).contains(&note1));
         // Convert Amiga period value to Hz.
         let freq = (7_159_092 / (u32::from(note1) * 2)) as u16;
         let ch = &mut g.music.channels[channel];
