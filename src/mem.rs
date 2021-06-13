@@ -79,7 +79,7 @@ impl Memory {
 }
 
 fn read_entries() -> Vec<Entry> {
-    let mut f = std::fs::File::open("memlist.bin").unwrap();
+    let mut f = std::fs::File::open("memlist.bin").expect("`memlist.bin` file not found");
     let mut entries = Vec::new();
     let mut buf = [0; 20];
     loop {

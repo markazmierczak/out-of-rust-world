@@ -1,5 +1,5 @@
 [package]
-name = "ano-the-rs-world"
+name = "oorw"
 version = "0.1.0"
 build = "build.rs"
 authors = ["Marcin Kaźmierczak <mar.kazmierczak@gmail.com>"]
